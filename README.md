@@ -8,9 +8,9 @@ Four focused tools — covering training phrase extraction, NLU overlap analysis
 
 ## Background
 
-Built as supporting tooling during an NLU quality initiative across multiple production Dialogflow CX agents handling millions of calls annually across two national telco brands.
+Built as supporting tooling during an NLU quality initiative across multiple production Dialogflow CX agents handling millions of chats via LLM playbooks annually across two national telco brands.
 
-The core problem: as conversational AI agents grow, intent libraries accumulate training phrase overlap, inconsistent casing, and underpopulated intents — all of which quietly degrade NLU confidence without any obvious signal in aggregate metrics. These tools were built to surface those issues systematically and produce prioritised, actionable output rather than raw data dumps.
+The core problem: as conversational AI agents grow, intent libraries accumulate training phrase overlap, inconsistent casing, and underpopulated intents — all of which quietly degrade NLU confidence without any obvious signal in aggregate metrics. These tools were built to surface those issues systematically and produce prioritised, actionable output rather than raw data dumps. LLM playbooks need context of misalignment in NLU and match as well
 
 The analysis pipeline (`phrase_extraction.py` → `analyse_training_phrases.py`) was used to produce remediation reports across agent deployments, identifying intent pairs with critical Jaccard overlap, intents with insufficient phrase coverage, and shared tokens that provided no discriminative signal to the model.
 
