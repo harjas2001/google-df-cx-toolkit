@@ -1,0 +1,42 @@
+{
+    "trainingPhrases": [ {
+      "parts": [ {
+        "text": ""
+      } ],
+      "repeatCount": 1,
+      "languageCode": "en"
+    }, {
+      "parts": [ {
+        "text": ""
+      }, {
+        "text": "",
+        "parameterId": ""
+      }, {
+        "text": ""
+      } ],
+      "repeatCount": 1,
+      "languageCode": "en"
+    }, {
+      "parts": [ {
+        "text": ""
+      }, {
+        "text": "",
+        "parameterId": ""
+      }, {
+        "text": ""
+      } ],
+      "repeatCount": 1,
+      "languageCode": "en"
+    }, {
+      "parts": [ {
+        "text": ""
+      }, {
+        "text": "",
+        "parameterId": ""
+      }, {
+        "text": ""
+      } ],
+      "repeatCount": 1,
+      "languageCode": "en"
+    }]
+}
