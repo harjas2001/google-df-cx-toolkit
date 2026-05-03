@@ -1,108 +1,126 @@
-"""
-phrase_extraction.py
-─────────────────────────────────────────────────────────────────────────────
-Extracts training phrases from a filtered set of Dialogflow CX intents and
-writes them to a CSV file (columns: utterance, intent).
+# Dialogflow CX Toolkit
 
-The output CSV is the input for analyse_training_phrases.py.
+A collection of diagnostic and analysis tools for Dialogflow CX agent development and quality assurance. Built from production NLU work on enterprise-scale conversational AI deployments.
 
-Configuration:
-  AGENT_INTENTS_PATH  — path to the intents folder in your agent export
-  OUTPUT_CSV          — output filename
-  Both are loaded from .env (see .env.example).
+Four focused tools — covering training phrase extraction, NLU overlap analysis, casing quality checks, and flow page auditing.
 
-Intent filter:
-  Only intents listed in config/include_intents.txt are extracted.
-  Copy config/include_intents.example.txt to get started.
-─────────────────────────────────────────────────────────────────────────────
-"""
+---
 
-import os
-import json
-import csv
-from pathlib import Path
-from dotenv import load_dotenv
+## Background
 
-load_dotenv()
+Built as supporting tooling during an NLU quality initiative across multiple production Dialogflow CX agents handling millions of calls annually across two national telco brands.
 
-# ── Config ────────────────────────────────────────────────────────────────────
-AGENT_INTENTS_PATH = os.getenv("AGENT_INTENTS_PATH", "agent/intents")
-OUTPUT_CSV         = os.getenv("OUTPUT_CSV", "training_phrases.csv")
+The core problem: as conversational AI agents grow, intent libraries accumulate training phrase overlap, inconsistent casing, and underpopulated intents — all of which quietly degrade NLU confidence without any obvious signal in aggregate metrics. These tools were built to surface those issues systematically and produce prioritised, actionable output rather than raw data dumps.
 
-# ── Intent whitelist — loaded from private config file ────────────────────────
-_INTENTS_FILE = Path("config/include_intents.txt")
+The analysis pipeline (`phrase_extraction.py` → `analyse_training_phrases.py`) was used to produce remediation reports across agent deployments, identifying intent pairs with critical Jaccard overlap, intents with insufficient phrase coverage, and shared tokens that provided no discriminative signal to the model.
 
-if not _INTENTS_FILE.exists():
-    raise FileNotFoundError(
-        f"\n[phrase_extraction] Intent filter file not found: {_INTENTS_FILE}\n"
-        f"  Copy config/include_intents.example.txt → config/include_intents.txt\n"
-        f"  and populate it with the intent names you want to extract."
-    )
+---
 
-INCLUDE_INTENTS = {
-    line.strip()
-    for line in _INTENTS_FILE.read_text(encoding="utf-8").splitlines()
-    if line.strip() and not line.strip().startswith("#")
-}
+## Tools
 
-# ── Extraction ────────────────────────────────────────────────────────────────
-data = {}
+### 1. `phrase_extraction.py`
 
-for intent_folder in os.listdir(AGENT_INTENTS_PATH):
-    intent_dir = os.path.join(AGENT_INTENTS_PATH, intent_folder)
+Extracts training phrases from a filtered set of intents in a Dialogflow CX agent export and writes them to a CSV file. The output is the input for the analysis script.
 
-    if not os.path.isdir(intent_dir):
-        continue
+```bash
+python phrase_extraction.py
+```
 
-    intent_name = intent_folder
+Reads intent names from `config/include_intents.txt` (gitignored). Only intents listed there are extracted.
 
-    if intent_name not in INCLUDE_INTENTS:
-        continue
+**Output:** `training_phrases.csv` (or as configured in `.env`)
 
-    training_phrases_dir = os.path.join(intent_dir, "trainingPhrases")
+---
 
-    if not os.path.isdir(training_phrases_dir):
-        continue
+### 2. `analyse_training_phrases.py`
 
-    for filename in os.listdir(training_phrases_dir):
-        if not filename.endswith(".json"):
-            continue
+Deep NLU analysis of training phrases. Takes the CSV from the extraction step and produces a fully formatted 6-sheet Excel report.
 
-        file_path = os.path.join(training_phrases_dir, filename)
+```bash
+python analyse_training_phrases.py
+```
 
-        with open(file_path, "r", encoding="utf-8") as f:
-            json_data = json.load(f)
+| Sheet | What it shows |
+|---|---|
+| Summary | Per-intent phrase count, word count stats, health flags |
+| Token Overlap Matrix | Pairwise Jaccard similarity heatmap across all intents |
+| High Overlap Pairs | Ranked intent pairs above the overlap threshold |
+| Shared Tokens Detail | Every shared token and which intents use it |
+| Intent Word Stats | Full word-count distribution per intent |
+| Action Items | Prioritised remediation tasks (CRITICAL / HIGH / MEDIUM / LOW) |
 
-        # Dialogflow CX training phrase schema:
-        # { "trainingPhrases": [ { "parts": [ { "text": "..." } ], ... } ] }
-        for phrase_obj in json_data.get("trainingPhrases", []):
-            phrase = "".join(
-                part.get("text", "")
-                for part in phrase_obj.get("parts", [])
-            )
-            if phrase:
-                if intent_name not in data:
-                    data[intent_name] = []
-                data[intent_name].append(phrase)
+**Output:** `training_phrase_analysis.xlsx` (or as configured in `.env`)
 
-# ── Write CSV ─────────────────────────────────────────────────────────────────
-with open(OUTPUT_CSV, "w", newline="", encoding="utf-8") as csvfile:
-    writer = csv.writer(csvfile)
-    writer.writerow(["utterance", "intent"])
-    for intent, phrases in data.items():
-        for phrase in phrases:
-            writer.writerow([phrase, intent])
+---
 
-print(f"Training phrases extracted → {OUTPUT_CSV}")
+### 3. `check_for_upper_lower_case.py`
 
-# Flag intents with fewer than 4 phrases
-intents_with_few_phrases = {
-    intent: len(phrases)
-    for intent, phrases in data.items()
-    if len(phrases) < 4
-}
+Scans all intents in a Dialogflow CX agent export and flags training phrases written entirely in CAPITAL LETTERS. All-caps phrases are a common data quality issue — they cause the NLU model to overfit to casing and typically originate from CRM exports or internal documentation.
 
-for intent, count in intents_with_few_phrases.items():
-    print(f'  ⚠ Intent "{intent}" has fewer than 5 phrases: {count}')
+```bash
+python check_for_upper_lower_case.py
+```
 
-print(f"Total intents with fewer than 5 phrases: {len(intents_with_few_phrases)}")
+Expects the standard Dialogflow CX export folder structure (`df_cx_agent/intents/`).
+
+---
+
+### 4. `lastPage_list.py`
+
+Iterates the exported agent config and prints all pages grouped by flow. Useful for auditing flow structure, mapping terminal pages, and identifying orphaned or unreachable pages before a release.
+
+```bash
+python lastPage_list.py
+```
+
+---
+
+## Setup
+
+```bash
+git clone https://github.com/your-username/dialogflow-cx-toolkit.git
+cd dialogflow-cx-toolkit
+
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+pip install -r requirements.txt
+
+cp .env.example .env
+# Edit .env with your agent paths and filenames
+
+cp config/include_intents.example.txt config/include_intents.txt
+# Edit include_intents.txt with your intent names
+```
+
+---
+
+## Configuration
+
+All paths and filenames are set in `.env` — see `.env.example` for all available options. No hardcoded values in any script.
+
+The intent whitelist for extraction is managed separately in `config/include_intents.txt` (gitignored). This keeps internal intent names out of the repository while making the tool fully reusable across different agents.
+
+---
+
+## Expected Agent Export Structure
+
+```
+df_cx_agent/
+├── flows/
+│   └── <flow-name>/
+│       └── pages/
+│           └── <page-name>.json
+└── intents/
+    └── <intent-name>/
+        └── trainingPhrases/
+            └── en.json
+```
+
+This matches the standard folder structure produced by the Dialogflow CX export function. See `sample_data/training_phrases_schema.json` for the expected JSON schema of a training phrases file.
+
+---
+
+## Stack
+
+Python · openpyxl · python-dotenv
