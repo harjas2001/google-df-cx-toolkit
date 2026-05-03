@@ -1,41 +1,43 @@
-# Private config — never commit
-config/include_intents.txt
+"""
+lastPage_list.py
+─────────────────────────────────────────────────────────────────────────────
+Iterates through a Dialogflow CX exported agent config and prints a complete
+list of all pages grouped by flow.
 
-# Environment
-.env
-*.env.local
+Useful for auditing flow structure, mapping last pages, and spotting orphaned
+or unreachable pages before a deployment.
 
-# Agent exports — real agent data should never be committed
-df_cx_agent/
-*.zip
+Configuration:
+  AGENT_FLOWS_PATH — path to the flows folder in your agent export.
+  Loaded from .env (see .env.example).
+─────────────────────────────────────────────────────────────────────────────
+"""
 
-# Output files
-*.xlsx
-*.csv
-!sample_data/
+import os
+from dotenv import load_dotenv
 
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-*.egg-info/
-dist/
-build/
+load_dotenv()
 
-# Virtual environments
-venv/
-.venv/
-env/
+# ── Config ────────────────────────────────────────────────────────────────────
+base_dir = os.getenv("AGENT_FLOWS_PATH", "df_cx_agent/flows")
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-.DS_Store
-Thumbs.db
+# ── Page extraction ───────────────────────────────────────────────────────────
+flow_pages = {}
 
-# Logs
-*.log
-logs/
+for flow_name in os.listdir(base_dir):
+    flow_path = os.path.join(base_dir, flow_name)
+
+    if os.path.isdir(flow_path):
+        pages_path = os.path.join(flow_path, "pages")
+
+        if os.path.isdir(pages_path):
+            json_files = [f for f in os.listdir(pages_path) if f.endswith(".json")]
+            page_names = [os.path.splitext(f)[0] for f in json_files]
+            flow_pages[flow_name] = page_names
+
+# ── Output ────────────────────────────────────────────────────────────────────
+for flow, pages in flow_pages.items():
+    print(f"\n{flow}")
+    print("-" * len(flow))
+    for page in pages:
+        print(page)
